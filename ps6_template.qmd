@@ -1,7 +1,7 @@
 ---
 title: "Problem Set 6 - Waze Shiny Dashboard"
-author: "Peter Ganong, Maggie Shi, and Andre Oviedo"
-date: today
+author: "Xinyi Chen"
+date: Nov,23
 format: 
   pdf:
     include-in-header: 
@@ -24,8 +24,8 @@ We use (`*`) to indicate a problem that we think might be time consuming.
 # Steps to submit (10 points on PS6) {-}
 
 1. "This submission is my work alone and complies with the 30538 integrity
-policy." Add your initials to indicate your agreement: \*\*\_\_\*\*
-2. "I have uploaded the names of anyone I worked with on the problem set **[here](https://docs.google.com/forms/d/185usrCREQaUbvAXpWhChkjghdGgmAZXA3lPWpXLLsts/edit)**"  \*\*\_\_\*\* (2 point)
+policy." Add your initials to indicate your agreement: XC
+2. "I have uploaded the names of anyone I worked with on the problem set **[here](https://docs.google.com/forms/d/185usrCREQaUbvAXpWhChkjghdGgmAZXA3lPWpXLLsts/edit)**"  XC (2 point)
 3. Late coins used this pset: \*\*\_\_\*\* Late coins left after submission: \*\*\_\_\*\*
 
 4. Before starting the problem set, make sure to read and agree to the terms of data usage for the Waze data [here](https://canvas.uchicago.edu/courses/59054/quizzes/130617).
@@ -84,45 +84,225 @@ import json
 1. 
 
 ```{python}
+import zipfile
 
+with zipfile.ZipFile("waze_data.zip", 'r') as zip_ref:
+    zip_ref.extractall() 
+
+sample_data = pd.read_csv("waze_data_sample.csv")
+
+print(sample_data.columns)
+print(sample_data.head(3))
 ```
+
+# ------------------------------------------
+# Variable Name       | Altair Data Type(s)
+# ------------------------------------------
+city                | Nominal (N)
+confidence          | Quantitative (Q)
+nThumbsUp           | Quantitative (Q)
+street              | Nominal (N)
+uuid                | Nominal (N)
+country             | Nominal (N)
+type                | Nominal (N)
+subtype             | Nominal (N)
+roadType            | Quantitative (Q)
+reliability         | Quantitative (Q)
+magvar              | Quantitative (Q)
+reportRating        | Quantitative (Q)
+# ------------------------------------------
+
+
 
 2. 
 
 ```{python}
+waze_data = pd.read_csv("waze_data.csv")
+
+missing_data_long = waze_data.isnull().melt(
+    var_name='Variable', value_name='is_missing')
+missing_data_long['Status'] = missing_data_long['is_missing'].map(
+    {True: 'Missing', False: 'Not Missing'})
+missing_data_long = missing_data_long.groupby(
+    ['Variable', 'Status']).size().reset_index(name='Count')
+
+alt.Chart(missing_data_long).mark_bar().encode(
+    x=alt.X('Variable', sort=None, title='Variables'),
+    y=alt.Y('Count', title='Count'),
+    color=alt.Color('Status')).properties(
+    title="Count of Missing and Non-Missing per Variable",
+    width=500,
+    height=300).configure_axis(
+    labelAngle=45)
 
 ```
 
 3. 
+```{python}
+# 3-1: Print unique values for 'type' and 'subtype'
+unique_types = waze_data['type'].unique()
+unique_subtypes = waze_data['subtype'].unique()
+print("Unique values in 'type':", unique_types)
+print("Unique values in 'subtype':", unique_subtypes)
+```
 
 ```{python}
-
+# 3-2: Count types with NA in 'subtype'
+na_subtype = waze_data[waze_data['subtype'].isna()]['type'].nunique()
+print(f"Number of unique 'type' values with NA in 'subtype': {na_subtype}")
 ```
+
+```{python}
+# 3-3: Identify types with complex subtypes that could have sub-subtypes
+combinations = waze_data[['type', 'subtype']].drop_duplicates()
+print("Unique combinations of 'type' and 'subtype':")
+print(combinations)
+```
+
+### 3-4: 
+
+### ChatGpt, "What is bulleted listed means? show me a qmd file example"
+
+- **ACCIDENT**
+  - Major
+  - Minor
+  - Unclassified
+
+- **HAZARD**
+  - On Road
+    - Car Stopped
+    - Construction
+    - Emergency Vehicle
+    - Ice
+    - Object
+    - Pothole
+    - Traffic Light Fault
+    - Lane Closed
+    - Roadkill
+  - On Shoulder
+    - Car Stopped
+    - Animals
+    - Missing Sign
+  - Weather
+    - Flood
+    - Fog
+    - Heavy Snow
+    - Hail
+  - Unclassified
+
+- **JAM**
+  - Heavy Traffic
+  - Moderate Traffic
+  - Standstill Traffic
+  - Light Traffic
+  - Unclassified
+
+- **ROAD CLOSED**
+  - Event
+  - Construction
+  - Hazard
+  - Unclassified
+
+### 3-5:
+
+Yes, I think we should keep NA subtypes here. Even if subtypes are missing, they may still provide meaningful information when comparing across types, such as when examining total counts. Removing these missing subtypes could lead to incomplete data and potentially introduce bias into the final results.
+
 
 4. 
 
 1. 
 ```{python}
+import pandas as pd
 
+columns = ['type', 'subtype', 'updated_type', 'updated_subtype', 'updated_subsubtype']
+
+crosswalk_df = pd.DataFrame(columns=columns)
+
+print(crosswalk_df)
 ```
 
 2. 
 
 ```{python}
+data = [
+    ('ACCIDENT', 'ACCIDENT_MAJOR', 'Accident', 'Major', None),
+    ('ACCIDENT', 'ACCIDENT_MINOR', 'Accident', 'Minor', None),
+    ('ACCIDENT', None, 'Accident', 'Unclassified', None),
+    
+    ('HAZARD', 'HAZARD_ON_ROAD_CAR_STOPPED', 'Hazard', 'On Road', 'Car Stopped'),
+    ('HAZARD', 'HAZARD_ON_ROAD_CONSTRUCTION', 'Hazard', 'On Road', 'Construction'),
+    ('HAZARD', 'HAZARD_ON_ROAD_EMERGENCY_VEHICLE', 'Hazard', 'On Road', 'Emergency Vehicle'),
+    ('HAZARD', 'HAZARD_ON_ROAD_ICE', 'Hazard', 'On Road', 'Ice'),
+    ('HAZARD', 'HAZARD_ON_ROAD_OBJECT', 'Hazard', 'On Road', 'Object'),
+    ('HAZARD', 'HAZARD_ON_ROAD_POT_HOLE', 'Hazard', 'On Road', 'Pothole'),
+    ('HAZARD', 'HAZARD_ON_ROAD_TRAFFIC_LIGHT_FAULT', 'Hazard', 'On Road', 'Traffic Light Fault'),
+    ('HAZARD', 'HAZARD_ON_ROAD_LANE_CLOSED', 'Hazard', 'On Road', 'Lane Closed'),
+    ('HAZARD', 'HAZARD_ON_ROAD_ROAD_KILL', 'Hazard', 'On Road', 'Roadkill'),
+    ('HAZARD', 'HAZARD_ON_ROAD', 'Hazard', 'On Road', None),  
+    
+    ('HAZARD', 'HAZARD_ON_SHOULDER_CAR_STOPPED', 'Hazard', 'On Shoulder', 'Car Stopped'),
+    ('HAZARD', 'HAZARD_ON_SHOULDER_ANIMALS', 'Hazard', 'On Shoulder', 'Animals'),
+    ('HAZARD', 'HAZARD_ON_SHOULDER_MISSING_SIGN', 'Hazard', 'On Shoulder', 'Missing Sign'),
+    ('HAZARD', 'HAZARD_ON_SHOULDER', 'Hazard', 'On Shoulder', None), 
+    ('HAZARD', 'HAZARD_WEATHER_FLOOD', 'Hazard', 'Weather', 'Flood'),
+    ('HAZARD', 'HAZARD_WEATHER_FOG', 'Hazard', 'Weather', 'Fog'),
+    ('HAZARD', 'HAZARD_WEATHER_HEAVY_SNOW', 'Hazard', 'Weather', 'Heavy Snow'),
+    ('HAZARD', 'HAZARD_WEATHER_HAIL', 'Hazard', 'Weather', 'Hail'),
+    ('HAZARD', 'HAZARD_WEATHER', 'Hazard', 'Weather', None), 
+    ('HAZARD', None, 'Hazard', 'Unclassified', None),
+    
+    ('JAM', 'JAM_HEAVY_TRAFFIC', 'Jam', 'Heavy Traffic', None),
+    ('JAM', 'JAM_MODERATE_TRAFFIC', 'Jam', 'Moderate Traffic', None),
+    ('JAM', 'JAM_STAND_STILL_TRAFFIC', 'Jam', 'Standstill Traffic', None),
+    ('JAM', 'JAM_LIGHT_TRAFFIC', 'Jam', 'Light Traffic', None),
+    ('JAM', None, 'Jam', 'Unclassified', None),
+    
+    ('ROAD_CLOSED', 'ROAD_CLOSED_EVENT', 'Road Closed', 'Event', None),
+    ('ROAD_CLOSED', 'ROAD_CLOSED_CONSTRUCTION', 'Road Closed', 'Construction', None),
+    ('ROAD_CLOSED', 'ROAD_CLOSED_HAZARD', 'Road Closed', 'Hazard', None),
+    ('ROAD_CLOSED', None, 'Road Closed', 'Unclassified', None)
+]
 
+data_df = pd.DataFrame(data, columns=columns)
+crosswalk_df = pd.concat([crosswalk_df, data_df], ignore_index=True)
+
+print(crosswalk_df.head(5))
 ```
 
 3. 
-
 ```{python}
+merged_data = waze_data.merge(crosswalk_df, on=['type', 'subtype'], how='left')
 
+accident_unclassified_count = merged_data.query("updated_type == 'Accident' and updated_subtype == 'Unclassified'").shape[0]
+
+# reference of .query():
+# https://stackoverflow.com/questions/44610766/select-columns-using-pandas-dataframe-query
+# ChatGpt, 'Why my code with .query() do not show the count?", Using .shape[0] on the result gives the count of rows that match the criteria
+
+print(accident_unclassified_count)
 ```
 
 4. 
 
 ```{python}
+# Perform an outer merge 
+comparison = crosswalk_df[['type', 'subtype']].merge(
+    merged_data[['type', 'subtype']].drop_duplicates(),
+    on=['type', 'subtype'],
+    how='outer',
+    indicator=True)
+
+only_in_crosswalk = comparison[comparison['_merge'] == 'left_only']
+only_in_merged = comparison[comparison['_merge'] == 'right_only']
+# ChatGpt, 'how can I filter merge result column to compare if I do not have left_only and right_only', to get help with comparison[]
+
+if only_in_crosswalk.empty and only_in_merged.empty:
+    print("The crosswalk and merged dataset have the same values in type and subtype.")
+else:
+    print("The crosswalk and merged dataset do not have the same values in type and subtype.")
 
 ```
+
 
 
 # App #1: Top Location by Alert Type Dashboard (30 points){-}
@@ -131,22 +311,90 @@ import json
 
 a. 
 ```{python}
+merged_data['longitude'] = merged_data ['geo'].str.extract(r'POINT\(([-\d.]+) [-\d.]+\)').astype(float)
+
+merged_data['latitude'] = merged_data ['geo'].str.extract(r'POINT\([-\d.]+ ([-\d.]+)\)').astype(float)
+
+# ChatGpt, Can you help me write a a regular expression that extracts the coordinates of longitude and latitude. And Chatgpt tell me to use .str.extract(r'POINT\(([-\d.]+) [-\d.]+\)')
 
 ```
 
 b. 
 ```{python}
+# round longitude and latitude into step of 0.01
+merged_data['binned_longitude'] = merged_data['longitude'].apply(lambda x: round(x, 2))
+merged_data['binned_latitude'] = merged_data['latitude'].apply(lambda x: round(x, 2))
 
+# Group by the binned combinations and count occurrences
+merged_data['binned_combination'] = list(zip(merged_data['binned_latitude'], merged_data['binned_longitude']))
+
+grouped = merged_data['binned_combination'].value_counts()
+
+# Find the most frequent binned combination
+most_frequent_combination = grouped.idxmax()
+most_frequent_count = grouped.max()
+
+# Display results
+print(f"The most frequent binned latitude-longitude combination is: {most_frequent_combination}")
+print(f"Number of observations: {most_frequent_count}")
 ```
 
 
 c. 
 ```{python}
+aggregated_data = (merged_data
+    .groupby(['binned_latitude', 'binned_longitude', 'updated_type', 'updated_subtype'])
+    .size()
+    .reset_index(name='alert_count')
+)
 
+# Sort by the highest alert counts
+top_alerts = aggregated_data.sort_values(by='alert_count', ascending=False).head(10)
+
+output_file = os.path.join('top_alerts_map', "top_alerts_map.csv")
+top_alerts.to_csv(output_file, index=False)
+
+# number of rows in DataFrame/CSV
+print(len(top_alerts))
 ```
 
-d. 
+
+The level of aggregation in this case are ['binned_latitude', 'binned_longitude', 'type', 'subtype']. 
+
+And he number of rows in the DataFrame is: 10
+
+2. 
 ```{python}
+jam_heavy = merged_data[
+    (merged_data['updated_type'] == 'Jam') & (merged_data['updated_subtype'] == 'Heavy Traffic')]
+
+# Aggregate again by binned_latitude and binned_longtitude
+aggregated_jam_heavy = (
+    jam_heavy.groupby(['binned_latitude', 'binned_longitude'])
+    .size()
+    .reset_index(name='alert_count'))
+
+top_jam_bins = aggregated_jam_heavy.sort_values(by='alert_count', ascending=False).head(10)
+
+lat_min, lat_max = top_jam_bins['binned_latitude'].min() - 0.02, top_jam_bins['binned_latitude'].max() + 0.02
+long_min, long_max = top_jam_bins['binned_longitude'].min() - 0.02, top_jam_bins['binned_longitude'].max() + 0.02
+# ChatGpt, can you write a example of define a axis domains for better visualization that I can set between some minimum and maximum values for X and Y.
+
+scatter_plot = (
+    alt.Chart(top_jam_bins)
+    .mark_circle()
+    .encode(
+        x=alt.X('binned_longitude:Q', title='Longitude', scale=alt.Scale(domain=[long_min, long_max])),
+        y=alt.Y('binned_latitude:Q', title='Latitude', scale=alt.Scale(domain=[lat_min, lat_max])),
+        size=alt.Size('alert_count:Q', title='Number of Alerts'),
+        tooltip=['binned_latitude', 'binned_longitude', 'alert_count']
+    )
+    .properties(
+        title='Top 10 Bins with Highest Number of "Jam - Heavy Traffic" Alerts',
+        width=600,
+        height=600
+    ))
+scatter_plot
 
 ```
 
@@ -155,53 +403,79 @@ d.
 a. 
 
 ```{python}
+import requests
 
+url = "https://data.cityofchicago.org/resource/igwz-8jzy.geojson"
+
+path = "Boundaries_Neighborhoods.geojson"
+
+with open(path, "wb") as file:
+    file.write(requests.get(url).content)
 ```
-    
+  
 
 b. 
 ```{python}
-# MODIFY ACCORDINGLY
-file_path = "./top_alerts_map/chicago-boundaries.geojson"
-#----
+from shapely.geometry import shape
+
+file_path = "/Users/sara/Desktop/Python/problem_sets/ps6/PS6_Xinyi/Boundaries_Neighborhoods.geojson"
 
 with open(file_path) as f:
     chicago_geojson = json.load(f)
 
 geo_data = alt.Data(values=chicago_geojson["features"])
-
 ```
 
 4. 
 
 ```{python}
+chicago_map= alt.Chart(geo_data).mark_geoshape(
+    fillOpacity=0.4, 
+    stroke='black'
+).project(
+    type="identity", reflectY=True
+).encode(
+    tooltip=["properties.neighborhood:N"] 
+)
+# ChatGpt, can you help me adjust transparency for my map, like change it to 0.4.
 
+final_chart = chicago_map + scatter_plot
+final_chart.properties(
+    title="Top Alerts with Chicago Neighborhoods",
+    height=600,
+    width=600
+)
 ```
 
 5. 
 
 a. 
 
-```{python}
+![dropdown_menu](Q5_a.png){ width=40% }
 
-```
+There are 16 combinations of type and subtypes in the Shiny App.
 
 b. 
-```{python}
 
-```
+![dropdown_menu](Q5_b.png){ width=50% }
 
 c. 
-```{python}
 
-```
+![dropdown_menu](Q5_c.png){ width=50% }
 
 d. 
-```{python}
 
-```
+Question: How does the distribution of "Road Closed - Construction" alerts compare to "Road Closed - Hazard" alerts in Chicago?
+
+![dropdown_menu](Q5_d.png){ width=40% }
+![dropdown_menu](Q5_d2.png){ width=40% }
+
+Answer: "Road Closed - Construction" alerts have higher densities in specific areas, while "Road Closed - Hazard" alerts are sparsely distributed. And that might becasue construction alerts likely follow scheduled urban development plans, whereas hazard alerts appear due to temporary or unplanned issues.
 
 e. 
+
+We add a "Time of Alert" column, which captures the timestamp of each alert and "Severity Level" column which categorizes the intensity or importance of each alert. For example, "Accident - Major" is high, "Jam - Light Traffic" is low. And for time column, on dashboard we can choose a time range like, Show alerts between 8 AM and 6 PM" for more specific queries.
+
 
 # App #2: Top Location by Alert Type and Hour Dashboard (20 points) {-}
 
@@ -209,17 +483,99 @@ e.
 
 a. 
 
+Looking at the provided dataset, collapsing it by the ts (timestamp) column might not be a good idea in most cases. Each row corresponds to a unique event with its associated attributes (e.g., updated_type, updated_subtype, location). Collapsing by ts would aggregate events occurring at the same time, potentially losing the granularity and specificity of individual events. Instead, consider creating additional features or aggregating over broader time intervals while preserving the granularity of other columns for more comprehensive analysis.
 
-    
 b. 
 ```{python}
+merged_data = pd.read_csv("merged_data.csv")
 
+# Convert 'ts' to extract the hour
+merged_data['hour'] = pd.to_datetime(merged_data['ts']).dt.hour.astype(str) + ":00"
+
+merged_data['latitude_bin'] = merged_data['latitude'].round(2)
+merged_data['longitude_bin'] = merged_data['longitude'].round(2)
+
+collapsed_by_hour = (
+    merged_data
+    .groupby(['hour', 'updated_type', 'updated_subtype','latitude_bin', 'longitude_bin'])
+    .size()
+    .reset_index(name='alert_count'))
+
+output_folder = "top_alerts_map_byhour"
+output_file = f"{output_folder}/top_alerts_map_byhour.csv"
+collapsed_by_hour.to_csv(output_file, index=False)
+
+print(f"Number of rows in the dataset: {len(collapsed_by_hour)}")
 ```
 
 c.
 
 ```{python}
+# Load the GeoJSON data for the map layer
+with open("Boundaries_Neighborhoods.geojson") as f:
+    chicago_geojson = json.load(f)
 
+geo_data = alt.Data(values=chicago_geojson["features"])
+
+merged_data['hour'] = pd.to_datetime(
+    merged_data['ts']).dt.hour.astype(str) + ":00"
+
+jam_heavy = merged_data[
+    (merged_data['updated_type'] == 'Jam') & (
+        merged_data['updated_subtype'] == 'Heavy Traffic')
+]
+
+jam_heavy['binned_latitude'] = jam_heavy['latitude'].round(2)
+jam_heavy['binned_longitude'] = jam_heavy['longitude'].round(2)
+
+# Select three hours 
+hours_to_plot = ['14:00', '20:00', '22:00']
+
+plots = []
+for hour in hours_to_plot:
+    jam_heavy_hour = jam_heavy[jam_heavy['hour'] == hour]
+    aggregated_jam_heavy_hour = (
+        jam_heavy_hour.groupby(['binned_latitude', 'binned_longitude'])
+        .size()
+        .reset_index(name='alert_count'))
+
+    top_jam_bins = aggregated_jam_heavy_hour.sort_values(
+        by='alert_count', ascending=False).head(10)
+
+    lat_min, lat_max = top_jam_bins['binned_latitude'].min(
+    ) - 0.02, top_jam_bins['binned_latitude'].max() + 0.02
+    long_min, long_max = top_jam_bins['binned_longitude'].min(
+    ) - 0.02, top_jam_bins['binned_longitude'].max() + 0.02
+
+    scatter_plot = alt.Chart(top_jam_bins).mark_circle().encode(
+        x=alt.X('binned_longitude:Q', title='Longitude',
+                scale=alt.Scale(domain=[long_min, long_max])),
+        y=alt.Y('binned_latitude:Q', title='Latitude',
+                scale=alt.Scale(domain=[lat_min, lat_max])),
+        size=alt.Size('alert_count:Q', title='Number of Alerts'),
+        tooltip=['binned_latitude', 'binned_longitude', 'alert_count']
+    ).properties(
+        title=f'Top 10 Locations for Jam - Heavy Traffic at {hour}',
+        width=600,
+        height=600)
+
+    map_layer = alt.Chart(geo_data).mark_geoshape(
+        fillOpacity=0.3,
+        stroke='black').encode(
+        tooltip=["properties.neighborhood:N"]
+    ).project(
+    type="identity", reflectY=True
+).properties(
+        width=600,
+        height=600)
+
+    combined_plot = map_layer + scatter_plot
+    plots.append(combined_plot)
+
+# ChatGpt, "helo debug my code that I want to apply three hours I choose and apply to the map, and append map with scatter plot togather with time"
+
+for plot in plots:
+    plot.display()
 ```
     
 
@@ -227,9 +583,10 @@ c.
 
 a. 
 
-
+![dropdown_menu](Q6_a.png){ width=40% }
 
 b. 
+
 
 
 c. 
