@@ -1,13 +1,17 @@
 ---
 title: "Problem Set 6 - Waze Shiny Dashboard"
 author: "Xinyi Chen"
-date: Nov,23
+date: Nov,22,2024
 format: 
   pdf:
+    documentclass: article
+    fontsize: 10pt 
     include-in-header: 
        text: |
          \usepackage{fvextra}
          \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+         \usepackage{geometry}
+         \geometry{top=1in, bottom=1in, left=0.75in, right=0.75in} 
 include-before-body:
   text: |
     \RecustomVerbatimEnvironment{verbatim}{Verbatim}{
@@ -17,6 +21,7 @@ include-before-body:
       breaklines
     }
 ---
+
 1. **ps6:** Due Sat 23rd at 5:00PM Central. Worth 100 points (80 points from questions, 10 points for correct submission and 10 points for code style) + 10 extra credit. 
 
 We use (`*`) to indicate a problem that we think might be time consuming. 
@@ -26,7 +31,7 @@ We use (`*`) to indicate a problem that we think might be time consuming.
 1. "This submission is my work alone and complies with the 30538 integrity
 policy." Add your initials to indicate your agreement: XC
 2. "I have uploaded the names of anyone I worked with on the problem set **[here](https://docs.google.com/forms/d/185usrCREQaUbvAXpWhChkjghdGgmAZXA3lPWpXLLsts/edit)**"  XC (2 point)
-3. Late coins used this pset: \*\*\_\_\*\* Late coins left after submission: \*\*\_\_\*\*
+3. Late coins used this pset: 0 Late coins left after submission: 4
 
 4. Before starting the problem set, make sure to read and agree to the terms of data usage for the Waze data [here](https://canvas.uchicago.edu/courses/59054/quizzes/130617).
 
@@ -72,9 +77,12 @@ import altair as alt
 import pandas as pd
 from datetime import date
 import numpy as np
+import os
 alt.data_transformers.disable_max_rows() 
-
+alt.renderers.enable("png")
 import json
+import warnings 
+warnings.filterwarnings('ignore')
 ```
 
 # Background {-}
@@ -90,27 +98,23 @@ with zipfile.ZipFile("waze_data.zip", 'r') as zip_ref:
     zip_ref.extractall() 
 
 sample_data = pd.read_csv("waze_data_sample.csv")
-
-print(sample_data.columns)
-print(sample_data.head(3))
 ```
 
-# ------------------------------------------
-# Variable Name       | Altair Data Type(s)
-# ------------------------------------------
-city                | Nominal (N)
-confidence          | Quantitative (Q)
-nThumbsUp           | Quantitative (Q)
-street              | Nominal (N)
-uuid                | Nominal (N)
-country             | Nominal (N)
-type                | Nominal (N)
-subtype             | Nominal (N)
-roadType            | Quantitative (Q)
-reliability         | Quantitative (Q)
-magvar              | Quantitative (Q)
-reportRating        | Quantitative (Q)
-# ------------------------------------------
+| Variable Name   | Altair Data Type(s) |
+|-----------------|----------------------|
+| city            | Nominal (N)         |
+| confidence      | Quantitative (Q)    |
+| nThumbsUp       | Quantitative (Q)    |
+| street          | Nominal (N)         |
+| uuid            | Nominal (N)         |
+| country         | Nominal (N)         |
+| type            | Nominal (N)         |
+| subtype         | Nominal (N)         |
+| roadType        | Quantitative (Q)    |
+| reliability     | Quantitative (Q)    |
+| magvar          | Quantitative (Q)    |
+| reportRating    | Quantitative (Q)    |
+
 
 
 
@@ -210,21 +214,19 @@ Yes, I think we should keep NA subtypes here. Even if subtypes are missing, they
 
 4. 
 
-1. 
+1.
 ```{python}
 import pandas as pd
 
 columns = ['type', 'subtype', 'updated_type', 'updated_subtype', 'updated_subsubtype']
 
 crosswalk_df = pd.DataFrame(columns=columns)
-
-print(crosswalk_df)
 ```
 
-2. 
+2.
 
 ```{python}
-data = [
+type_subtype_data= [
     ('ACCIDENT', 'ACCIDENT_MAJOR', 'Accident', 'Major', None),
     ('ACCIDENT', 'ACCIDENT_MINOR', 'Accident', 'Minor', None),
     ('ACCIDENT', None, 'Accident', 'Unclassified', None),
@@ -263,13 +265,15 @@ data = [
     ('ROAD_CLOSED', None, 'Road Closed', 'Unclassified', None)
 ]
 
-data_df = pd.DataFrame(data, columns=columns)
-crosswalk_df = pd.concat([crosswalk_df, data_df], ignore_index=True)
+type_subtype_data_df = pd.DataFrame(type_subtype_data, columns=columns)
+crosswalk_df = pd.concat([crosswalk_df, type_subtype_data_df], ignore_index=True)
 
-print(crosswalk_df.head(5))
+# Chatgpt, "help me debug my code, I want to my each () to be a row in a dataframe"
+
+print(len(crosswalk_df))
 ```
 
-3. 
+3.
 ```{python}
 merged_data = waze_data.merge(crosswalk_df, on=['type', 'subtype'], how='left')
 
@@ -282,7 +286,11 @@ accident_unclassified_count = merged_data.query("updated_type == 'Accident' and 
 print(accident_unclassified_count)
 ```
 
-4. 
+24359 rows are there for Accident - Unclassified.
+
+\newpage
+
+4.
 
 ```{python}
 # Perform an outer merge 
@@ -294,6 +302,7 @@ comparison = crosswalk_df[['type', 'subtype']].merge(
 
 only_in_crosswalk = comparison[comparison['_merge'] == 'left_only']
 only_in_merged = comparison[comparison['_merge'] == 'right_only']
+
 # ChatGpt, 'how can I filter merge result column to compare if I do not have left_only and right_only', to get help with comparison[]
 
 if only_in_crosswalk.empty and only_in_merged.empty:
@@ -322,21 +331,28 @@ merged_data['latitude'] = merged_data ['geo'].str.extract(r'POINT\([-\d.]+ ([-\d
 b. 
 ```{python}
 # round longitude and latitude into step of 0.01
-merged_data['binned_longitude'] = merged_data['longitude'].apply(lambda x: round(x, 2))
-merged_data['binned_latitude'] = merged_data['latitude'].apply(lambda x: round(x, 2))
+merged_data['binned_longitude'] = merged_data['longitude'].apply(
+    lambda x: round(x, 2))
+merged_data['binned_latitude'] = merged_data['latitude'].apply(
+    lambda x: round(x, 2))
 
-# Group by the binned combinations and count occurrences
-merged_data['binned_combination'] = list(zip(merged_data['binned_latitude'], merged_data['binned_longitude']))
+# Group by the binned and count 
+merged_data['binned_combination'] = list(
+    zip(merged_data['binned_latitude'], merged_data['binned_longitude']))
 
 grouped = merged_data['binned_combination'].value_counts()
 
-# Find the most frequent binned combination
 most_frequent_combination = grouped.idxmax()
 most_frequent_count = grouped.max()
 
-# Display results
-print(f"The most frequent binned latitude-longitude combination is: {most_frequent_combination}")
+print(
+    f"The most frequent binned latitude-longitude combination is: {most_frequent_combination}")
+
 print(f"Number of observations: {most_frequent_count}")
+
+# referece of using zip() and list():
+# https://stackoverflow.com/questions/29139350/difference-between-ziplist-and-ziplist
+# https://realpython.com/python-zip-function/ 
 ```
 
 
@@ -374,29 +390,37 @@ aggregated_jam_heavy = (
     .size()
     .reset_index(name='alert_count'))
 
-top_jam_bins = aggregated_jam_heavy.sort_values(by='alert_count', ascending=False).head(10)
+top_jam_bins = aggregated_jam_heavy.sort_values(
+    by='alert_count', ascending=False).head(10)
 
-lat_min, lat_max = top_jam_bins['binned_latitude'].min() - 0.02, top_jam_bins['binned_latitude'].max() + 0.02
-long_min, long_max = top_jam_bins['binned_longitude'].min() - 0.02, top_jam_bins['binned_longitude'].max() + 0.02
+lat_min, lat_max = top_jam_bins['binned_latitude'].min(
+) - 0.02, top_jam_bins['binned_latitude'].max() + 0.02
+long_min, long_max = top_jam_bins['binned_longitude'].min(
+) - 0.02, top_jam_bins['binned_longitude'].max() + 0.02
 # ChatGpt, can you write a example of define a axis domains for better visualization that I can set between some minimum and maximum values for X and Y.
 
 scatter_plot = (
     alt.Chart(top_jam_bins)
     .mark_circle()
     .encode(
-        x=alt.X('binned_longitude:Q', title='Longitude', scale=alt.Scale(domain=[long_min, long_max])),
-        y=alt.Y('binned_latitude:Q', title='Latitude', scale=alt.Scale(domain=[lat_min, lat_max])),
+        x=alt.X('binned_longitude:Q', title='Longitude',
+                scale=alt.Scale(domain=[long_min, long_max])),
+        y=alt.Y('binned_latitude:Q', title='Latitude',
+                scale=alt.Scale(domain=[lat_min, lat_max])),
         size=alt.Size('alert_count:Q', title='Number of Alerts'),
         tooltip=['binned_latitude', 'binned_longitude', 'alert_count']
     )
     .properties(
         title='Top 10 Bins with Highest Number of "Jam - Heavy Traffic" Alerts',
-        width=600,
-        height=600
+        width=400,
+        height=400
     ))
-scatter_plot
+
+scatter_plot.show()
 
 ```
+
+\newpage
 
 3. 
     
@@ -429,21 +453,21 @@ geo_data = alt.Data(values=chicago_geojson["features"])
 4. 
 
 ```{python}
-chicago_map= alt.Chart(geo_data).mark_geoshape(
-    fillOpacity=0.4, 
+chicago_map = alt.Chart(geo_data).mark_geoshape(
+    fillOpacity=0.4,
     stroke='black'
 ).project(
     type="identity", reflectY=True
 ).encode(
-    tooltip=["properties.neighborhood:N"] 
+    tooltip=["properties.neighborhood:N"]
 )
 # ChatGpt, can you help me adjust transparency for my map, like change it to 0.4.
 
 final_chart = chicago_map + scatter_plot
 final_chart.properties(
     title="Top Alerts with Chicago Neighborhoods",
-    height=600,
-    width=600
+    height=400,
+    width=400
 )
 ```
 
@@ -451,24 +475,27 @@ final_chart.properties(
 
 a. 
 
-![dropdown_menu](Q5_a.png){ width=40% }
+![dropdown_menu](Q5_a.png){ width=30% }
 
 There are 16 combinations of type and subtypes in the Shiny App.
 
 b. 
 
-![dropdown_menu](Q5_b.png){ width=50% }
+![jam_heavy traffic](Q5_b.png){ width=50% }
 
 c. 
 
-![dropdown_menu](Q5_c.png){ width=50% }
+![Road_close event](Q5_c.png){ width=50% }
+
+\newpage
 
 d. 
 
 Question: How does the distribution of "Road Closed - Construction" alerts compare to "Road Closed - Hazard" alerts in Chicago?
 
-![dropdown_menu](Q5_d.png){ width=40% }
-![dropdown_menu](Q5_d2.png){ width=40% }
+![road close construction](Q5_d.png){ width=50% }
+
+![road close hazard](Q5_d2.png){ width=50% }
 
 Answer: "Road Closed - Construction" alerts have higher densities in specific areas, while "Road Closed - Hazard" alerts are sparsely distributed. And that might becasue construction alerts likely follow scheduled urban development plans, whereas hazard alerts appear due to temporary or unplanned issues.
 
@@ -490,14 +517,15 @@ b.
 merged_data = pd.read_csv("merged_data.csv")
 
 # Convert 'ts' to extract the hour
-merged_data['hour'] = pd.to_datetime(merged_data['ts']).dt.hour.astype(str) + ":00"
+merged_data['hour'] = pd.to_datetime(
+    merged_data['ts']).dt.hour.astype(str) + ":00"
 
 merged_data['latitude_bin'] = merged_data['latitude'].round(2)
 merged_data['longitude_bin'] = merged_data['longitude'].round(2)
 
 collapsed_by_hour = (
     merged_data
-    .groupby(['hour', 'updated_type', 'updated_subtype','latitude_bin', 'longitude_bin'])
+    .groupby(['hour', 'updated_type', 'updated_subtype', 'latitude_bin', 'longitude_bin'])
     .size()
     .reset_index(name='alert_count'))
 
@@ -505,18 +533,15 @@ output_folder = "top_alerts_map_byhour"
 output_file = f"{output_folder}/top_alerts_map_byhour.csv"
 collapsed_by_hour.to_csv(output_file, index=False)
 
+# ChatGpt, 'How can I extract hour from my data of time, suppose I already change the format to datatime'
+
 print(f"Number of rows in the dataset: {len(collapsed_by_hour)}")
 ```
 
 c.
 
 ```{python}
-# Load the GeoJSON data for the map layer
-with open("Boundaries_Neighborhoods.geojson") as f:
-    chicago_geojson = json.load(f)
-
-geo_data = alt.Data(values=chicago_geojson["features"])
-
+# same step to extract time to hour
 merged_data['hour'] = pd.to_datetime(
     merged_data['ts']).dt.hour.astype(str) + ":00"
 
@@ -528,8 +553,8 @@ jam_heavy = merged_data[
 jam_heavy['binned_latitude'] = jam_heavy['latitude'].round(2)
 jam_heavy['binned_longitude'] = jam_heavy['longitude'].round(2)
 
-# Select three hours 
-hours_to_plot = ['14:00', '20:00', '22:00']
+# Select three hours I want
+hours_to_plot = ['10:00', '14:00', '21:00']
 
 plots = []
 for hour in hours_to_plot:
@@ -542,6 +567,7 @@ for hour in hours_to_plot:
     top_jam_bins = aggregated_jam_heavy_hour.sort_values(
         by='alert_count', ascending=False).head(10)
 
+    # set domain of x and y to ensure all point insde
     lat_min, lat_max = top_jam_bins['binned_latitude'].min(
     ) - 0.02, top_jam_bins['binned_latitude'].max() + 0.02
     long_min, long_max = top_jam_bins['binned_longitude'].min(
@@ -556,18 +582,17 @@ for hour in hours_to_plot:
         tooltip=['binned_latitude', 'binned_longitude', 'alert_count']
     ).properties(
         title=f'Top 10 Locations for Jam - Heavy Traffic at {hour}',
-        width=600,
-        height=600)
+        width=350,
+        height=350)
 
     map_layer = alt.Chart(geo_data).mark_geoshape(
         fillOpacity=0.3,
         stroke='black').encode(
         tooltip=["properties.neighborhood:N"]
     ).project(
-    type="identity", reflectY=True
-).properties(
-        width=600,
-        height=600)
+        type="identity", reflectY=True).properties(
+        width=350,
+        height=350)
 
     combined_plot = map_layer + scatter_plot
     plots.append(combined_plot)
@@ -579,18 +604,28 @@ for plot in plots:
 ```
     
 
+
 2.
 
-a. 
+a.
 
-![dropdown_menu](Q6_a.png){ width=40% }
+![dropdown and slider](Q6_a.png){ width=50% }
 
 b. 
 
+![Top 10 Locations for Jam - Heavy Traffic at 10:00](Q6_b1.png){ width=50% }
 
+![Top 10 Locations for Jam - Heavy Traffic at 14:00](Q6_b2.png){ width=50% }
+
+![Top 10 Locations for Jam - Heavy Traffic at 21:00](Q6_b3.png){ width=50% }
 
 c. 
 
+![ road construction morning](Q6_c1.png){ width=50% }
+
+![ road construction night](Q6_c2.png){ width=50% }
+
+road construction is done more during night hours, like 
 
 # App #3: Top Location by Alert Type and Hour Dashboard (20 points){-}
 
@@ -599,9 +634,53 @@ c.
 
 a. 
 
-b. 
+Collapsing the dataset by range of hours can be a good idea because picking a range of time—such as morning, noon, afternoon, and night—is often more meaningful in reality. These broader time ranges align better with natural patterns of human activity and help users understand how time influences the top 10 alert locations in a more intuitive way.
 
+b. 
 ```{python}
+# Ensure 'hour' is in correct format
+merged_data['ts'] = pd.to_datetime(merged_data['ts'], errors='coerce')  # Parse the datetime
+
+merged_data['hour'] = merged_data['ts'].dt.hour  
+
+# ChatGpt, debug my code beucase there is typeerror on hour column.
+
+# Define the range of hours
+start_hour = 6
+end_hour = 9
+
+jam_heavy['hour'] = pd.to_numeric(jam_heavy['hour'], errors='coerce')
+
+jam_heavy_range = jam_heavy[
+    (jam_heavy['hour'] >= start_hour) & 
+    (jam_heavy['hour'] < end_hour)
+]
+
+# Scatter plot for the top 10 locations
+scatter_plot = alt.Chart(top_jam_bins).mark_circle().encode(
+    x=alt.X('binned_longitude:Q', title='Longitude', scale=alt.Scale(domain=[long_min, long_max])),
+    y=alt.Y('binned_latitude:Q', title='Latitude', scale=alt.Scale(domain=[lat_min, lat_max])),
+    size=alt.Size('alert_count:Q', title='Number of Alerts'),
+    tooltip=['binned_latitude', 'binned_longitude', 'alert_count']
+).properties(
+    title=f'Top 10 Locations for Jam - Heavy Traffic (6AM-9AM)',
+)
+
+# Map layer for Chicago
+map_layer = alt.Chart(geo_data).mark_geoshape(
+    fillOpacity=0.3,
+    stroke='black'
+).encode(
+    tooltip=["properties.neighborhood:N"]
+).project(
+    type="identity", reflectY=True
+)
+
+combined_plot = map_layer + scatter_plot
+
+combined_plot.properties(
+    width=400,
+    height=400).display()
 
 ```
 
@@ -609,18 +688,41 @@ b.
 
 a. 
 
+![ui_code](Q7_a.png){ width=50% }
+
+![ui_app](Q7_a2.png){ width=50% }
 
 b. 
-    
+
+![“Jam - Heavy Traffic with range](Q7_b.png){ width=50% }
+
 3. 
 
 a. 
-    
+
+![switch button](Q7_3a.png){ width=50% }
 
 b. 
 
+![switch button is not toggled](Q7_3b1.png){ width=50% }
+
+![switch button is toggled](Q7_3b2.png){ width=50% }
 
 c. 
 
+![slider for a single hour ](Q7_3c1.png){ width=50% }
+
+![slider for a range of hours](Q7_3c2.png){ width=50% }
 
 d.
+
+First, I think a new column called 'time_periods' should be added to the dataset, categorizing the data into two time periods: Morning (6 AM - 12 PM) and Afternoon (12 PM - 6 PM). Then, as described in the steps above, the data can be aggregated by latitude, longitude, and the newly created time_period variable, while also calculating the number of alerts for each group.
+
+On the UI side, it might be useful to allow users to select either a specific time or a time period. Additionally, users could have the option to choose broader time periods, such as Morning or Afternoon, for easier interpretation and understanding.
+
+For the graph, I suggest adding a color indicator to represent time periods (e.g., red for Morning and blue for Afternoon) and using circle size to indicate the number of alerts. This can be implemented by encoding time_period in the color channel and alert_count in the size channel of the Altair chart. This approach will visually distinguish the time periods and provide a clear understanding of the number of alerts at different times.
+
+
+```{python}
+pip freeze > requirements.txt
+```
