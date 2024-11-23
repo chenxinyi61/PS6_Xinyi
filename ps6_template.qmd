@@ -376,7 +376,7 @@ aggregated_data = (merged_data
 )
 
 # Sort by the highest alert counts
-top_alerts = aggregated_data.sort_values(by='alert_count', ascending=False).head(10)
+top_alerts = aggregated_data.sort_values(by='alert_count', ascending=False)
 
 output_file = os.path.join('top_alerts_map', "top_alerts_map.csv")
 top_alerts.to_csv(output_file, index=False)
@@ -386,9 +386,9 @@ print(len(top_alerts))
 ```
 
 
-The aggregation data is groupby ['binned_latitude', 'binned_longitude', 'type', 'subtype']. 
+The aggregation data is groupby ['binned_latitude', 'binned_longitude', 'type', 'subtype'，'count']. 
 
-And the number of rows in the DataFrame is: 10.
+And the number of rows in the DataFrame is: 6675.
 
 2. 
 ```{python}
